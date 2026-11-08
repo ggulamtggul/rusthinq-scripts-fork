@@ -44,6 +44,10 @@ fn start_publish(ctx) {
 // One report: (delta, dev_total, tick) identifies it; retransmissions of
 // the same report are dropped. Returns true when the report was new.
 fn report(ctx, delta, dev_total, tick) {
+    // Diagnostic (ops, 2026-11-08): publish the device's own running total as is, to see
+    // over a few days how and when it resets (upstream issue #117 asks whether it drops
+    // to exactly 0). Published on every report, retransmissions included; HA keeps changes.
+    il::publish_property(ctx, "energy_device_counter", dev_total.to_string());
     let key = delta.to_string() + ":" + dev_total.to_string() + ":" + tick.to_string();
     if ctx.state_get("energy_last_report") == key { return false; }
     ctx.state_set("energy_last_report", key);

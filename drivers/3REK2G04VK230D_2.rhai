@@ -47,7 +47,8 @@ fn descriptor(ctx) {
         energy: #{ type: "number", class: "energy", series: "counter", unit: "Wh", label: "누적 전력량" },
         energy_hour: #{ type: "number", class: "energy", unit: "Wh", label: "이번 시간 전력량" },
         energy_day: #{ type: "number", class: "energy", unit: "Wh", label: "오늘 전력량" },
-        energy_month: #{ type: "number", class: "energy", unit: "Wh", label: "이번 달 전력량" }
+        energy_month: #{ type: "number", class: "energy", unit: "Wh", label: "이번 달 전력량" },
+        energy_device_counter: #{ type: "number", category: "diagnostic", unit: "Wh", label: "기기 누적값(진단)" }
     };
     json_stringify(#{ il: 0, kind: "fridge", label: "Kimchi refrigerator", vendor: "LG",
                       model: ctx.model_id(), props: props })
