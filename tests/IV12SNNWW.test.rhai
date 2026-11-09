@@ -180,3 +180,12 @@ fn test_delta_with_only_unlisted_fields_publishes() {
     expect(d.property("do_not_disturb").contains("22:00"), "do_not_disturb carries the schedule");
     expect_eq(d.script_error(), ());
 }
+
+fn test_product_version_published_as_text() {
+    let d = device();
+    d.feed(blob_mon("{\"mon\":{\"VERSION\":\"02.13.0109.21354.9165\"}}"));
+    expect_eq(d.property("product_version"), "02.13.0109.21354.9165");
+    d.feed(full_frame());
+    expect_eq(d.property("product_version"), "02.13.0109.21354.9165");
+    expect_eq(d.script_error(), ());
+}
