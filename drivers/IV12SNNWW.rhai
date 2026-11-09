@@ -200,7 +200,7 @@ fn descriptor(ctx) {
         update: #{ type: "select", category: "diagnostic", label: "펌웨어 업데이트",
                    options: ["대기", "다운로드 중", "완료", "검증 실패", "다운로드 실패"] },
         update_progress: #{ type: "number", category: "diagnostic", unit: "%", label: "업데이트 진행률" },
-        product_version: #{ type: "number", category: "diagnostic", label: "제품 버전" },
+        product_version: #{ type: "text", category: "diagnostic", label: "제품 버전" },
         language: #{ type: "text", category: "diagnostic", label: "언어" },
         robot_event: #{ type: "text", category: "diagnostic", label: "로봇 이벤트" },
         clean_order: #{ type: "text", category: "diagnostic", label: "청소 순서 (JSON)" },
@@ -394,7 +394,7 @@ fn on_data(ctx, data) {
     pub_maint(ctx, body, "MAINT_FILTER", "maint_filter");
     pub_maint(ctx, body, "MAINT_MOP", "maint_mop");
     pub_maint(ctx, body, "MAINT_DUSTBAG", "maint_dust_bag");
-    pub_num(ctx, body, "VERSION", "product_version");
+    pub_raw(ctx, body, "VERSION", "product_version");
     pub_raw(ctx, body, "LANGUAGE", "language");
     pub_raw(ctx, body, "ROBOT_EVENT", "robot_event");
     pub_raw(ctx, body, "CLEAN_ORDER", "clean_order");
