@@ -190,7 +190,7 @@ fn descriptor(ctx) {
         ai_detection: #{ type: "binary", category: "config", label: "AI 장애물 회피", rw: true },
         carpet_avoid: #{ type: "text", category: "diagnostic", label: "카펫 청소 방식 (원본)" },
         station_mode: #{ type: "select", category: "config", label: "자동 먼지 비움 설정", options: ["자동", "수동"] },
-        clean_time: #{ type: "number", class: "duration", unit: "min", label: "청소 시간" },
+        clean_time: #{ type: "number", class: "duration", unit: "s", label: "청소 시간" },
         clean_where: #{ type: "number", category: "diagnostic", label: "청소 위치" },
         maint_main_brush: #{ type: "number", category: "diagnostic", label: "메인 브러시 사용량" },
         maint_side_brush: #{ type: "number", category: "diagnostic", label: "사이드 브러시 사용량" },
@@ -334,8 +334,19 @@ fn on_data(ctx, data) {
     let text = ""; try { text = bytes_utf8(data.extract(start, end - start + 1)); } catch { return; }
     let s = (); try { s = json_parse(text); } catch { return; }
     if type_of(s) != "map" { return; }
-    if s.contains("controlResult") { return; }
-    let body = if type_of(s["mon"]) == "map" { s["mon"] } else { s };
+    if s.contains("controlResult") {
+        let cr = s["controlResult"];
+        if type_of(cr) != "map" || type_of(cr["data"]) != "map" || !cr["data"].contains("CLEAN_TIME") {
+            return;
+        }
+    }
+    let body = if type_of(s["mon"]) == "map" {
+        s["mon"]
+    } else if s.contains("controlResult") {
+        s["controlResult"]["data"]
+    } else {
+        s
+    };
     let known = false;
     for k in ["ROBOT_STATE", "BATT_P", "MODE", "SUCTION_LEVEL", "WATERSUPPLY_LEVEL",
               "VOLUME_LEVEL", "CLEAN_TYPE", "ZZ_DIST", "STATION_SET", "SMART_TURBO", "BUTTON_LOCK",
