@@ -141,7 +141,9 @@ fn course_defaults(ctx,course,preserve) {
  let d=draft(ctx);let dirty=dirty(ctx);
  let updates=#{course:course,baseDownloadCourseData:0,downloadCourse:0};
  for key in rule.keys() {updates[key]=rule[key][0];}
- for key in updates.keys() {if preserve && dirty[key]==true {continue;}d[key]=updates[key];dirty[key]=true;}
+ // preserve=true is the first-report reconcile: fill defaults without marking them as the
+ // user's choice, so later device reports can still replace them (see on_data).
+ for key in updates.keys() {if preserve && dirty[key]==true {continue;}d[key]=updates[key];if !preserve {dirty[key]=true;}}
  ctx.state_set("draft",d);ctx.state_set("dirty",dirty);publish_draft(ctx);true
 }
 fn on_data(ctx,data) {
@@ -151,7 +153,7 @@ fn on_data(ctx,data) {
  let obs=observed(ctx);let d=draft(ctx);let dirty=dirty(ctx);
  for f in model().fields {
   if f.offset+f.length>r.len() {continue;}
-  let raw=raw_value(r,f);obs[f.key]=raw;if dirty[f.key]!=true {d[f.key]=raw;}
+  let raw=raw_value(r,f);obs[f.key]=raw;if dirty[f.key]!=true && !settings().contains(f.key) {d[f.key]=raw;}
   if public_keys().contains(f.key) || f.key=="remoteMaintain" {
    let prop=entity(f.key);
    if ["childLock","doorLock","remoteStart","remoteMaintain"].contains(f.key) {il::publish_property(ctx,prop,c::on_off(raw));}
@@ -160,6 +162,15 @@ fn on_data(ctx,data) {
    else {il::publish_property(ctx,prop,raw.to_string());}
   }
  }
+ // Settings the user has not touched in HA follow the panel whenever the appliance reports a
+ // real course; a powered-off report (course 0) keeps the current draft instead of clearing it.
+ if rules()[(obs.course ?? -1).to_string()]!=() {
+  let changed=false;
+  for key in settings() {if dirty[key]!=true && obs[key]!=() && d[key]!=obs[key] {d[key]=obs[key];changed=true;}}
+  if changed {ctx.state_set("draft",d);publish_draft(ctx);}
+ }
+ // Power off ends the session: HA-side choices stop overriding the panel from the next one.
+ if obs.state==0 && dirty.len()>0 {dirty=#{};ctx.state_set("dirty",dirty);}
  ctx.state_set("observed",obs);ctx.state_set("draft",d);
  if ctx.state_get("reconciled")!=true {
   ctx.state_set("reconciled",true);

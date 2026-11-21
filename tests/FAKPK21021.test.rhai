@@ -784,3 +784,54 @@ fn test_field_expansion_off() {
     expect_props(d, #{"add_garment": "off", "aidd_led": "off", "apply_buzzer": "on", "apply_remote_maintain": "on", "auto_soak": "off", "buzzer": "very_large", "child_lock": "false", "cloud_course": "none", "course": "none", "crease_care": "off", "current_date_display": "off", "current_time_display": "off", "delay": "off", "detergent_idx_show": "off", "dnn_ready": "off", "door": "false", "door_lock": "false", "drum_light": "off", "drumlight_auto_on": "off", "drumlight_opt": "on", "dry_ready_state": "off", "end_reserve_time": "off", "error": "no_error", "ez_detergent_set": "off", "ez_detergent_state": "off", "ez_softener_set": "off", "ez_softener_state": "off", "favorite": "off", "initial_time": "0", "laundry_care": "off", "laundry_care_setting": "off", "power": "false", "pre_state": "wash_complete", "pre_wash": "off", "remaining_time": "0", "remote_start": "false", "reserve_time": "0", "rinse_spin": "off", "smart_care": "on", "smart_grid": "off", "state": "power_off", "wash_load_display": "off", "water_plus": "off"});
     expect_eq(d.script_error(), ());
 }
+
+// Delay-end reservation, captured live 2026-11-22 00:10-00:11 (myclaude
+// devices/washer-FAKPK21021-reserve-2026-11-22.jsonl). After weight detection the washer reports
+// state 7, which the official modelJson names RESERVED (@CP_UX30_CARD_DELAY_SET); before this it
+// was missing from the table and HA showed the state as unknown for the whole wait.
+fn reserve_detecting() { "aaff330a0098000e60000100ec008600000000000000000000000000000000000000005e01009a000000002d0400000000000004500100300000000004000400004000000000000000f00000000408000000000303040672000000000001ea003400340000005e03019a000000042d0400000000200004900180300000000004000400014000000000000000f00000000408000000afc3bb" }
+fn reserve_detecting_2() { "aaff330a0098000e6f000100ec0086000303040672000000000001ea003400340000005e03019a000000042d0400000000200004900180300000000004000400014000000000000000f00000000408000000000303040672000000000001e9003400340000005e03019a000000042d0400000000200004900180300000000004000400014000000000000000f000000004080000006a19bb" }
+fn reserve_waiting() { "aaff330a0098000e71000100ec0086000303040672000000000001e9003400340000005e03019a000000042d0400000000200004900180300000000004000400014000000000000000f00000000408000000000303040672000000000001e9007600760000005e07039a040000042d0400000000200004900180300000000004000400014000000000000000f000000004080000006e51bb" }
+fn washing_ai() { "aaff330a009800b29c000100ec008600030302087200000000000000002400290035005e0b029a02000002270400000000200004900100300000000004000400004000000000000000f0000000040800000000030302087200000000000000002300290058005e0b029a02000002270400000000200004900100300000000004000400004000000000000000f000000004080000001929bb" }
+fn powered_off() { "aaff330a009800b61f000100ec00860000000000000000000000000000000000015c005e00109a00000000280400000000000004410000300000000004000400004000000000000000f000000004080000000000000000000000000000000000000000015c005e00109a00000000280400000000000004010000300000000004000400004000000000000000f00000000408000000bc8ebb" }
+
+fn test_delay_end_reservation_reports_reserved() {
+    let d = device();
+    d.feed(reserve_detecting());
+    expect_props(d, #{"state": "detecting_weight", "reserve_time": "490", "remaining_time": "52", "course": "ai_wash"});
+    d.feed(reserve_detecting_2());
+    d.feed(reserve_waiting());
+    // reserve_time counts down to the delayed end; remaining_time is the wash itself once weighed
+    expect_props(d, #{"state": "reserved", "pre_state": "detecting_weight", "reserve_time": "489", "remaining_time": "118", "initial_time": "118", "course": "ai_wash", "delay": "on", "end_reserve_time": "on", "setting_course": "ai_wash"});
+    expect_eq(d.sent().len(), 0);
+    expect_eq(d.script_error(), ());
+}
+
+// The first report arriving while the washer is off fills setting defaults (standard). Those
+// defaults are not the user's choice, so a course later picked on the panel replaces them
+// (seen live 2026-11-22: course ai_wash while setting_course stayed standard).
+fn test_setting_course_follows_panel_until_changed_in_ha() {
+    let d = device();
+    d.feed(powered_off());
+    expect_props(d, #{"setting_course": "standard"});
+    d.feed(reserve_detecting());
+    expect_props(d, #{"course": "ai_wash", "setting_course": "ai_wash", "setting_soil_wash": "standard"});
+    expect_eq(d.script_error(), ());
+}
+
+// A course chosen in HA wins over the panel for the rest of the session; power off ends that,
+// and the next panel course is followed again.
+fn test_setting_course_ha_choice_lasts_until_power_off() {
+    let d = device();
+    d.feed(washing_ai());
+    expect_props(d, #{"setting_course": "ai_wash"});
+    d.set("setting_course", "standard");
+    expect_props(d, #{"setting_course": "standard"});
+    d.feed(washing_ai());
+    expect_props(d, #{"setting_course": "standard"});
+    d.feed(powered_off());
+    expect_props(d, #{"setting_course": "standard"});
+    d.feed(washing_ai());
+    expect_props(d, #{"setting_course": "ai_wash"});
+    expect_eq(d.script_error(), ());
+}
