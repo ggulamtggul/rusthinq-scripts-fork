@@ -161,7 +161,8 @@ fn test_reconnect_restores_availability_without_a_state_frame() {
     expect_eq(d.script_error(), ());
 }
 
-fn test_energy_sums_captured_deltas_including_repeated_reports() {
+// Separate 15-minute reports, each acked; unacked, the appliance would resend each one.
+fn test_energy_sums_captured_deltas() {
     let d = device();
     d.start();
     expect_eq(d.property("energy"), "0");
@@ -178,6 +179,24 @@ fn test_energy_sums_captured_deltas_including_repeated_reports() {
     fresh.start();
     expect_eq(fresh.property("energy"), "0");
     expect_eq(d.script_error(), ());
+}
+
+// Captured live, 2026-11-02 to 11-09: unacked, each of these arrived six times.
+fn test_reports_are_acked_as_the_cloud_does_and_status_records_are_not() {
+    let d = device();
+    d.feed(uv_done());
+    d.feed(query_reply());
+    expect_eq(d.clips().len(), 0);
+    for frame in ["aa0912af0d0003d1bb", "aa0a12e2da01025888bb", "aa12121f01fd00000000000000000000bebb"] {
+        d.feed(frame);
+    }
+    let clips = d.clips();
+    expect_eq(clips.len(), 3);
+    expect_eq(clips[0].cmd, "ack");
+    expect_eq(clips[0].data, "AA08F000AF0400BB");
+    expect_eq(clips[1].data, "AA08F000E204DDBB");
+    expect_eq(clips[2].data, "AA08F0001F0490BB");
+    expect_eq(d.property("energy"), "3");
 }
 
 fn test_invalid_energy_envelopes_do_not_add_to_total() {
@@ -317,4 +336,59 @@ fn test_user_capture_keeps_two_byte_volumes_and_last_report_semantics() {
  d.feed("aa12121f00fc00000000000000000000bcbb");expect_props(d,#{normal_water_last_dispensed:"252",hot_water_last_dispensed:"0",cold_water_last_dispensed:"0",clean_water_last_dispensed:"0"});
  d.feed("aa12121f00fc00000000000000000000bcbb");expect_props(d,#{normal_water_last_dispensed:"252",hot_water_last_dispensed:"0",cold_water_last_dispensed:"0",clean_water_last_dispensed:"0"});
  expect_eq(d.property("water_usage_total"),());expect_eq(d.script_error(),());
+}
+
+// The owner's rethink driver (tests/cloud/devices/1WPU4CIGCR__2.test.ts, deployed tree): its
+// STATE frame is real, captured 2026-07-28; the others are that frame with the bytes named
+// below changed and the checksum recomputed, as in that suite.
+fn owner_state() { "aa3a12ec020102010101ffff00ff010101ffff071c121eff01ff03000001020002010101ffff00ff010101ffff071c121eff01ff03000001ccbb" }
+
+fn test_owner_capture_decodes_settings_and_raw_schedule() {
+ let d=device();d.feed(owner_state());
+ expect_props(d,#{status:"normal",water_selection:"normal",water_amount:"120ml",default_water:"last_used",default_amount:"120ml",button_sound:"true",auto_care:"true",not_use_notice:"false",self_clean_next:"07-28 18:30"});
+}
+
+// Frame bytes 42 / 50 / 38 (button sound / auto care / unused-water notice) = ff: the model's
+// IGNORE sentinel, "this unit does not report the field". The reading is absent, not false.
+fn test_ignore_setting_codes_are_absent_instead_of_reading_false() {
+ let d=device();d.feed(owner_state());
+ d.feed("aa3a12ec020102010101ffff00ff010101ffff071c121eff01ff03000001020002010101ffffffff0101ffffff071c121effffff03000001c1bb");
+ expect_props(d,#{button_sound:"",auto_care:"",not_use_notice:""});
+ d.feed(owner_state());expect_props(d,#{button_sound:"true",auto_care:"true",not_use_notice:"false"});
+}
+
+// The same bytes = 02 / fe / 02: undocumented codes, not the sentinel. The last confirmed
+// reading stands (first moved to false / false / true so it cannot pass by coincidence).
+fn test_undocumented_setting_codes_leave_the_last_reading() {
+ let d=device();d.feed(owner_state());
+ d.feed("aa3a12ec020102010101ffff00ff010101ffff071c121eff01ff03000001020002010101ffff01ff010100ffff071c121eff00ff03000001cdbb");
+ expect_props(d,#{button_sound:"false",auto_care:"false",not_use_notice:"true"});
+ d.feed("aa3a12ec020102010101ffff00ff010101ffff071c121eff01ff03000001020002010101ffff02ff010102ffff071c121efffeff03000001ccbb");
+ expect_props(d,#{button_sound:"false",auto_care:"false",not_use_notice:"true"});
+ expect_eq(d.script_error(),());
+}
+
+// An unset reservation (0xff in any of frame bytes 45..48 = month / day / hour / minute) or an
+// impossible date clears self_clean_next rather than leaving the previous one standing.
+fn test_an_unset_or_impossible_self_clean_reservation_clears_the_previous_one() {
+ let d=device();
+ for frame in [
+  "aa3a12ec020102010101ffff00ff010101ffff071c121eff01ff03000001020002010101ffff00ff010101ffffff1c121eff01ff03000001c4bb", // month ff
+  "aa3a12ec020102010101ffff00ff010101ffff071c121eff01ff03000001020002010101ffff00ff010101ffff071cff1eff01ff03000001d3bb", // hour ff
+  "aa3a12ec020102010101ffff00ff010101ffff071c121eff01ff03000001020002010101ffff00ff010101ffff071c12ffff01ff030000012fbb", // minute ff
+  "aa3a12ec020102010101ffff00ff010101ffff071c121eff01ff03000001020002010101ffff00ff010101ffff021e121eff01ff03000001c3bb", // 02-30
+  "aa3a12ec020102010101ffff00ff010101ffff071c121eff01ff03000001020002010101ffff00ff010101ffff041f121eff01ff03000001ccbb"  // 04-31
+ ] {d.feed(owner_state());expect_eq(d.property("self_clean_next"),"07-28 18:30");d.feed(frame);expect_eq(d.property("self_clean_next"),"");}
+ // with no year on the wire, 29 February is a real date
+ d.feed("aa3a12ec020102010101ffff00ff010101ffff071c121eff01ff03000001020002010101ffff00ff010101ffff021d121eff01ff03000001c0bb");
+ expect_eq(d.property("self_clean_next"),"02-29 18:30");
+}
+
+// Frame byte 41 = 4: continuous exists only for the live selection, so it is not published as
+// the default. Keeping the last reading is deliberate: the porting notes allow an unknown enum
+// to be absent or to leave the last confirmed reading, and the other selects here keep it.
+fn test_continuous_is_not_a_default_amount() {
+ let d=device();d.feed(owner_state());
+ d.feed("aa3a12ec020102010101ffff00ff010101ffff071c121eff01ff03000001020002010101ffff00ff010401ffff071c121eff01ff03000001c9bb");
+ expect_eq(d.property("default_amount"),"120ml");expect_eq(d.script_error(),());
 }

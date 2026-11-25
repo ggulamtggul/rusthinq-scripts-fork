@@ -11,6 +11,8 @@ a row, see [writing-a-driver.md](writing-a-driver.md#8-wiring-it-in).
   available, writes the LG app sent; not yet run live.
 - **constructed**: status frames built from documented offsets or around a
   captured record; writes match captured frames.
+- **unverified**: ported from a source with no tests and no captures; frames are
+  constructed from the source's code, so the tag map is the source's word alone.
 
 Each test file cites the captures its driver is checked against.
 
@@ -25,28 +27,34 @@ Each test file cites the captures its driver is checked against.
 | `2REF11EIDA__4` | refrigerator | AABB | captured |
 | `2REF11EIDG__4` | refrigerator | AABB | captured |
 | `2REF11EII__M2` | refrigerator (LMXS28626) | AABB | captured |
+| `2REF21EBNSX_3` | refrigerator (setpoints, express freeze, Smart Care+, section doors, ambient, energy) | AABB | captured |
 | `2REFT1DIC4P_U` | refrigerator | AABB | captured |
 | `2REFTBDII4P_U` | refrigerator | AABB | captured |
 | `2RES1VE600FWC` | refrigerator | AABB | captured |
 | `2RES1VE61NFWA` | refrigerator (alias of `2RES1VE600FWC`) | AABB | captured |
 | `2RES1VE61NFA2` | refrigerator | AABB | captured |
 | `1WPU4CIGCR__2` | water purifier | AABB | captured |
+| `3REK2G03VI200S_2` | kimchi refrigerator (three compartment modes, one-touch deodorize, energy) | AABB | captured |
+| `2REK1G04AR180` | kimchi refrigerator (read-only: four compartment modes, per-door sensors, room temperature estimate) | AABB | constructed |
 | `1WPD6CMIDR__3` | water/ice purifier (WD722RH) | AABB | captured |
 | `AIR_910604_WW` | air purifier | TLV | captured |
 | `HUM_056905_WW` | humidifying air purifier | TLV | captured |
 | `HWWA9K_F2` | CordZero A9 stick vacuum | AABB | captured |
 | `IV12SNNWW` | robot vacuum (RoboKing AI all-in-one) | JSON | live |
 | `PAC_910604_WW` | floor-standing air conditioner | TLV | captured |
-| `CST_570004_WW` | ceiling-cassette air conditioner | TLV | captured |
+| `CST_170004_WW` | ceiling-cassette air conditioner (`cst_common`) | TLV | constructed |
+| `CST_570004_WW` | ceiling-cassette air conditioner (`cst_common`) | TLV | captured |
 | `POT_056905_WW` | portable air conditioner | TLV | captured |
 | `RAC_056905_WW` | split air conditioner | TLV or ThinQ1 | captured |
 | `RAC_0B0001_WW` | split air conditioner (alias of `RAC_056905_WW`) | TLV | captured |
 | `WIN_056905_WW` | window air conditioner | TLV | constructed |
+| `VENT_725601_WW` | ventilator (ERV: power, mode, fan, UVnano, temperatures, filters, air quality) | TLV | unverified |
 | `D140110` | dishwasher (read-only) | AABB | captured |
 | `D0211` | dishwasher (read-only) | AABB | captured |
 | `D2211` | dishwasher (read-only; alias of `D0211`) | AABB | captured |
 | `D30` | dishwasher (read-only) | AABB | captured |
 | `H11` | dishwasher | AABB | captured |
+| `H01` | dishwasher (power, six settings; course start and energy unverified) | AABB | captured |
 | `N17` | dishwasher | AABB | captured |
 | `DHUM_056905_WW` | dehumidifier | TLV | captured |
 | `DHUM_231006_WW` | dehumidifier | TLV | captured |
@@ -63,8 +71,10 @@ Each test file cites the captures its driver is checked against.
 | `Y_VB_Y___W.B32QEUK` | washer with ezDispense | AABB envelope | captured |
 | `Y_V8_F___W.B_2QEUK` | washer-dryer | AABB envelope | captured |
 | `F24VDD` | washer | AABB monitoring | captured |
+| `F24D7N_KR_WIFI_V2` | washer (read-only; 25-byte monitoring record) | AABB monitoring | constructed |
 | `RH14_N_KR` | dryer | AABB monitoring | captured |
 | `RH16_T_KR` | heat-pump dryer | AABB | captured |
+| `RD20_S` | dryer (power, drum light auto-on) | AABB | captured |
 | `S3BF_POD_DN4` | styler | AABB monitoring | captured |
 | `ST_B_E4H01Y_APL` | styler | AABB | captured |
 | `S5MPC` | styler | AABB | captured |
@@ -75,13 +85,17 @@ Each test file cites the captures its driver is checked against.
 | `WLSI_633_` | induction range (read-only) | AABB | captured |
 | `WMVEL2137` | microwave/hood | AABB | captured |
 | `WMVEM1825` | microwave | AABB | captured |
+| `ML32PWFOTA` | lightwave oven (read-only; polls status every 30 s) | AABB | captured |
 | `Pd0F_F` | mini washer | AABB monitoring | constructed |
+| `MI2D7B` | MiniWash (power, pause/resume; start unverified) | AABB | captured |
 | `T1789EFH_F` | top-load washer | AABB | captured |
 | `TLVE5BB` | top-load washer (read-only) | AABB envelope | captured |
 | `F3L2CYU__` | washer (read-only) | AABB | captured |
 | `F3L7CYK5W_US_WIFI` | washer (read-only) | AABB | captured |
 | `F3P3CYK2_` | washer (power off only) | AABB | captured |
 | `FAFXU25006` | washer (read-only) | AABB envelope | captured |
+| `FX___N` | FX25 washer (power, course, cycle settings, remote start, laundry care) | AABB envelope | captured |
+| `FX___S` | FX25 washer, KR (power, course from the dial, cycle settings, reservation, start/pause/resume, appliance settings) | AABB | captured |
 | `RV13B6BSD_D_US_WIFI` | dryer (read-only) | AABB | captured |
 | `RV13B6ES_D_US_WIFI` | dryer (read-only) | AABB | captured |
 | `RV13U6AM8W_D_US_WIFI` | dryer (read-only) | AABB | captured |
